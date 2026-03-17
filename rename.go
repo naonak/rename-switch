@@ -134,7 +134,11 @@ func ProcessFile(cfg *Config, path string) error {
 	sameDir := targetDir == filepath.Dir(path)
 	destDisplay := newName
 	if !sameDir {
+		// Moving to a different directory: show full destination path
 		destDisplay = filepath.Join(targetDir, newName)
+	} else if displaySrc != filename {
+		// Renaming in place inside a subdir: show subdir prefix for clarity
+		destDisplay = filepath.Join(filepath.Dir(displaySrc), newName)
 	}
 
 	// [OK] only when both name and location are already correct
