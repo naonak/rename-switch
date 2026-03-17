@@ -109,7 +109,9 @@ Files without keys in the filename can still be processed via the slow path, but
 ```
 -apply          Apply renames (default: dry-run)
 -update-db      Refresh titledb cache from blawar/titledb
--src DIR      Games directory (default: current directory)
+-src DIR        Source directory (default: current directory)
+-dest DIR       Destination directory for renamed files (default: same as source)
+-recursive      Scan subdirectories recursively
 -nstool PATH    Path to nstool binary
 -version        Show version
 -h, -help       Show help
