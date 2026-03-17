@@ -1,0 +1,11 @@
+# Compiled binary
+rename-switch
+rename-switch.exe
+
+# Titledb cache files (downloaded at runtime)
+titledb_names.json
+titledb_versions.json
+*.json
+
+# macOS
+.DS_Store

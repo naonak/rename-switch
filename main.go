@@ -1,0 +1,231 @@
+package main
+
+import (
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+)
+
+const version = "1.0.0"
+
+const helpText = `rename-switch — Nintendo Switch game file renamer
+
+Usage:
+  rename-switch [options] [files...]
+
+Options:
+  -apply          Apply renames (default: dry-run, only shows what would change)
+  -update-db      Refresh titledb cache from blawar/titledb
+  -games DIR      Directory containing game files (default: current directory)
+  -nstool PATH    Path to nstool binary (default: searches PATH, then /usr/local/bin/nstool)
+  -version        Show version
+  -h, -help       Show this help
+
+Arguments:
+  files           One or more filenames to process (basename or full path).
+                  If omitted, all .nsp/.xci/.nsz/.xcz files in -games DIR are processed.
+
+Examples:
+  rename-switch                                         # dry-run on all files
+  rename-switch -apply                                  # apply all renames
+  rename-switch game.nsp                                # dry-run on one file
+  rename-switch -apply game.nsp update.nsp dlc.nsp      # apply on specific files
+  rename-switch -games /mnt/games -apply                # specify games directory
+  rename-switch -update-db                              # refresh titledb
+
+Output format:
+  [FAST] filename.nsp           ← TitleID found in filename (fast path)
+         → New Name [TYPE][titleid][vVERSION].nsp
+  [SLOW] filename.xci           ← TitleID extracted via nstool (slow path)
+         → New Name [TYPE][titleid][vVERSION].xci
+  [OK]   filename.nsp           ← already correctly named, no change needed
+
+Title types:
+  BASE  — base game (TitleID ends in 000)
+  UPD   — update/patch (TitleID ends in 800)
+  DLC   — downloadable content (all others)
+
+Errors are written to _errors.log in the games directory (only in -apply mode).
+`
+
+func main() {
+	var (
+		apply     bool
+		updateDB  bool
+		gamesDir  string
+		nstoolPath string
+		showVer   bool
+	)
+
+	flag.BoolVar(&apply, "apply", false, "Apply renames (default: dry-run)")
+	flag.BoolVar(&updateDB, "update-db", false, "Refresh titledb cache")
+	flag.StringVar(&gamesDir, "games", ".", "Games directory")
+	flag.StringVar(&nstoolPath, "nstool", "", "Path to nstool binary")
+	flag.BoolVar(&showVer, "version", false, "Show version")
+	flag.Usage = func() { fmt.Print(helpText) }
+	flag.Parse()
+
+	if showVer {
+		fmt.Printf("rename-switch %s\n", version)
+		return
+	}
+
+	// Resolve games directory
+	var err error
+	gamesDir, err = filepath.Abs(gamesDir)
+	if err != nil {
+		fatalf("invalid -games directory: %v\n", err)
+	}
+	if info, err := os.Stat(gamesDir); err != nil || !info.IsDir() {
+		fatalf("games directory does not exist: %s\n", gamesDir)
+	}
+
+	// Resolve nstool
+	if nstoolPath == "" {
+		nstoolPath = findNstool()
+	}
+
+	// Cache dir for titledb
+	cacheDir := filepath.Join(homeDir(), ".switch")
+
+	// Load or update titledb
+	if updateDB {
+		colorPrint(colorCyan, "Updating titledb...\n")
+		db := &TitleDB{}
+		if err := db.Update(cacheDir); err != nil {
+			fatalf("titledb update failed: %v\n", err)
+		}
+		colorPrint(colorGreen, "Database updated.\n")
+		return
+	}
+
+	db, err := LoadTitleDB(cacheDir)
+	if err != nil {
+		fatalf("failed to load titledb: %v\nRun with -update-db to download it.\n", err)
+	}
+
+	cfg := &Config{
+		Apply:     apply,
+		GamesDir:  gamesDir,
+		NstoolPath: nstoolPath,
+		DB:        db,
+	}
+
+	// Print mode header
+	if apply {
+		colorPrint(colorGreen, "=== APPLYING RENAMES ===\n")
+	} else {
+		colorPrint(colorYellow, "=== DRY RUN (use -apply to rename) ===\n")
+	}
+
+	// Clear errors log in apply mode
+	errorsLog := filepath.Join(gamesDir, "_errors.log")
+	if apply {
+		_ = os.WriteFile(errorsLog, nil, 0644)
+	}
+
+	// Collect target files
+	targets := flag.Args()
+
+	var files []string
+	if len(targets) > 0 {
+		for _, t := range targets {
+			// Accept both basename and full path
+			p := t
+			if !filepath.IsAbs(p) {
+				local := filepath.Join(gamesDir, p)
+				if _, err := os.Stat(local); err == nil {
+					p = local
+				}
+			}
+			if _, err := os.Stat(p); err != nil {
+				colorPrintf(colorRed, "File not found: %s\n", t)
+				continue
+			}
+			files = append(files, p)
+		}
+	} else {
+		files = collectGameFiles(gamesDir)
+	}
+
+	count, errors := 0, 0
+	for _, f := range files {
+		if err := ProcessFile(cfg, f); err != nil {
+			errors++
+			if apply {
+				appendLine(errorsLog, filepath.Base(f))
+			}
+		} else {
+			count++
+		}
+	}
+
+	if len(targets) == 0 {
+		fmt.Println()
+		colorPrintf(colorCyan, "Processed: %d files\n", count)
+		if errors > 0 {
+			colorPrintf(colorRed, "Errors: %d (see %s)\n", errors, errorsLog)
+		}
+		if !apply {
+			colorPrint(colorYellow, "Run with -apply to execute renames.\n")
+		}
+	}
+}
+
+// collectGameFiles returns all .nsp/.xci/.nsz/.xcz files in dir (non-recursive, no hidden files).
+func collectGameFiles(dir string) []string {
+	exts := map[string]bool{".nsp": true, ".xci": true, ".nsz": true, ".xcz": true}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var files []string
+	for _, e := range entries {
+		if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(e.Name()))
+		if exts[ext] {
+			files = append(files, filepath.Join(dir, e.Name()))
+		}
+	}
+	sort.Strings(files)
+	return files
+}
+
+func findNstool() string {
+	// Check common locations
+	candidates := []string{"/usr/local/bin/nstool", "/usr/bin/nstool"}
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			return c
+		}
+	}
+	// Will rely on PATH via exec.LookPath in nstool.go
+	return "nstool"
+}
+
+func homeDir() string {
+	h, err := os.UserHomeDir()
+	if err != nil {
+		return os.Getenv("HOME")
+	}
+	return h
+}
+
+func fatalf(format string, args ...any) {
+	colorPrintf(colorRed, format, args...)
+	os.Exit(1)
+}
+
+func appendLine(path, line string) {
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	fmt.Fprintln(f, line)
+}
