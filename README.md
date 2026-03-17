@@ -46,31 +46,41 @@ go build -o rename-switch .
 ./rename-switch -nstool /usr/local/bin/nstool -apply
 ```
 
-### With Docker
+### With Docker (recommended)
 
 ```bash
-# Build the image (compiles Go tool + nstool from source)
-docker build -t rename-switch .
+# Pull the latest image
+docker pull ghcr.io/naonak/rename-switch:latest
 
 # Dry-run on your games directory
 docker run --rm \
   -v ~/.switch:/root/.switch \
-  -v /path/to/switch-src:/games \
-  rename-switch
+  -v /path/to/switch-games:/games \
+  ghcr.io/naonak/rename-switch
 
 # Apply renames
 docker run --rm \
   -v ~/.switch:/root/.switch \
-  -v /path/to/switch-src:/games \
-  rename-switch -apply
+  -v /path/to/switch-games:/games \
+  ghcr.io/naonak/rename-switch -apply
 
 # Update titledb
 docker run --rm \
   -v ~/.switch:/root/.switch \
-  rename-switch -update-db
+  ghcr.io/naonak/rename-switch -update-db
 ```
 
 > **Note:** Mount `~/.switch` to persist the titledb cache and provide Switch keys (`prod.keys`, `title.keys`) for nstool decryption.
+
+#### Build from source
+
+```bash
+docker build -t rename-switch .
+docker run --rm \
+  -v ~/.switch:/root/.switch \
+  -v /path/to/switch-games:/games \
+  rename-switch -apply
+```
 
 ---
 
