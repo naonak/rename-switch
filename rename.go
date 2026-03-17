@@ -123,8 +123,23 @@ func ProcessFile(cfg *Config, path string) error {
 	}
 
 	// ── Output ───────────────────────────────────────────────────────────────────
-	if filename == newName {
-		colorPrintf(colorGray, "  [OK]   %s\n", filename)
+
+	// Display source as relative path from GamesDir (shows subdir context)
+	displaySrc := filename
+	if rel, err := filepath.Rel(cfg.GamesDir, path); err == nil && rel != filename {
+		displaySrc = rel
+	}
+
+	// Display destination: full path when moving to a different directory
+	sameDir := targetDir == filepath.Dir(path)
+	destDisplay := newName
+	if !sameDir {
+		destDisplay = filepath.Join(targetDir, newName)
+	}
+
+	// [OK] only when both name and location are already correct
+	if filename == newName && newPath == path {
+		colorPrintf(colorGray, "  [OK]   %s\n", displaySrc)
 		return nil
 	}
 
@@ -132,8 +147,8 @@ func ProcessFile(cfg *Config, path string) error {
 	if method == "SLOW" {
 		methodColor = colorYellow
 	}
-	colorPrintf(methodColor, "  [%s] %s\n", method, filename)
-	colorPrintf(colorCyan, "       → %s\n", newName)
+	colorPrintf(methodColor, "  [%s] %s\n", method, displaySrc)
+	colorPrintf(colorCyan, "       → %s\n", destDisplay)
 
 	if cfg.Apply {
 		if err := os.Rename(path, newPath); err != nil {
