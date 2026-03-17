@@ -35,5 +35,5 @@ COPY --from=nstool-builder /nstool/bin/nstool      /usr/local/bin/nstool
 WORKDIR /games
 
 ENTRYPOINT ["rename-switch", \
-    "-games",  "/games", \
+    "-src",    "/games", \
     "-nstool", "/usr/local/bin/nstool"]

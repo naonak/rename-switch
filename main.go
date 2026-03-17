@@ -20,7 +20,7 @@ Usage:
 Options:
   -apply          Apply renames (default: dry-run, only shows what would change)
   -update-db      Refresh titledb cache from blawar/titledb
-  -games DIR      Directory containing game files (default: current directory)
+  -src DIR        Directory containing game files (default: current directory)
   -nstool PATH    Path to nstool binary (default: searches PATH, then /usr/local/bin/nstool)
   -dest DIR       Destination directory for renamed files (default: same directory as source)
   -recursive      Scan subdirectories recursively
@@ -29,16 +29,16 @@ Options:
 
 Arguments:
   files           One or more filenames to process (basename or full path).
-                  If omitted, all .nsp/.xci/.nsz/.xcz files in -games DIR are processed.
+                  If omitted, all .nsp/.xci/.nsz/.xcz files in -src DIR are processed.
 
 Examples:
-  rename-switch                                         # dry-run on all files
-  rename-switch -apply                                  # apply all renames
-  rename-switch game.nsp                                # dry-run on one file
-  rename-switch -apply game.nsp update.nsp dlc.nsp      # apply on specific files
-  rename-switch -games /mnt/games -apply                # specify games directory
-  rename-switch -games /mnt/games -dest /mnt/out -apply # move renamed files to /mnt/out
-  rename-switch -update-db                              # refresh titledb
+  rename-switch                                       # dry-run on all files
+  rename-switch -apply                                # apply all renames
+  rename-switch game.nsp                              # dry-run on one file
+  rename-switch -apply game.nsp update.nsp dlc.nsp    # apply on specific files
+  rename-switch -src /mnt/games -apply                # specify source directory
+  rename-switch -src /mnt/games -dest /mnt/out -apply # move renamed files to /mnt/out
+  rename-switch -update-db                            # refresh titledb
 
 Output format:
   [FAST] filename.nsp           ← TitleID found in filename (fast path)
@@ -52,7 +52,7 @@ Title types:
   UPD   — update/patch (TitleID ends in 800)
   DLC   — downloadable content (all others)
 
-Errors are written to _errors.log in the games directory (only in -apply mode).
+Errors are written to _errors.log in the source directory (only in -apply mode).
 `
 
 func main() {
@@ -69,7 +69,7 @@ func main() {
 	flag.BoolVar(&apply, "apply", false, "Apply renames (default: dry-run)")
 	flag.BoolVar(&updateDB, "update-db", false, "Refresh titledb cache")
 	flag.BoolVar(&recursive, "recursive", false, "Scan subdirectories recursively")
-	flag.StringVar(&gamesDir, "games", ".", "Games directory")
+	flag.StringVar(&gamesDir, "src", ".", "Source directory")
 	flag.StringVar(&destDir, "dest", "", "Destination directory for renamed files (default: same dir as source)")
 	flag.StringVar(&nstoolPath, "nstool", "", "Path to nstool binary")
 	flag.BoolVar(&showVer, "version", false, "Show version")
@@ -81,14 +81,14 @@ func main() {
 		return
 	}
 
-	// Resolve games directory
+	// Resolve source directory
 	var err error
 	gamesDir, err = filepath.Abs(gamesDir)
 	if err != nil {
-		fatalf("invalid -games directory: %v\n", err)
+		fatalf("invalid -src directory: %v\n", err)
 	}
 	if info, err := os.Stat(gamesDir); err != nil || !info.IsDir() {
-		fatalf("games directory does not exist: %s\n", gamesDir)
+		fatalf("source directory does not exist: %s\n", gamesDir)
 	}
 
 	// Resolve nstool

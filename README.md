@@ -40,7 +40,7 @@ go build -o rename-switch .
 ./rename-switch -apply game.nsp update.nsp
 
 # Specify games directory
-./rename-switch -games /mnt/switch-games -apply
+./rename-switch -src /mnt/switch-src -apply
 
 # Custom nstool path
 ./rename-switch -nstool /usr/local/bin/nstool -apply
@@ -55,13 +55,13 @@ docker build -t rename-switch .
 # Dry-run on your games directory
 docker run --rm \
   -v ~/.switch:/root/.switch \
-  -v /path/to/switch-games:/games \
+  -v /path/to/switch-src:/games \
   rename-switch
 
 # Apply renames
 docker run --rm \
   -v ~/.switch:/root/.switch \
-  -v /path/to/switch-games:/games \
+  -v /path/to/switch-src:/games \
   rename-switch -apply
 
 # Update titledb
@@ -99,7 +99,7 @@ Files without keys in the filename can still be processed via the slow path, but
 ```
 -apply          Apply renames (default: dry-run)
 -update-db      Refresh titledb cache from blawar/titledb
--games DIR      Games directory (default: current directory)
+-src DIR      Games directory (default: current directory)
 -nstool PATH    Path to nstool binary
 -version        Show version
 -h, -help       Show help
