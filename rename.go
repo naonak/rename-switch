@@ -107,7 +107,7 @@ func ProcessFile(cfg *Config, path string) error {
 		for i := 2; ; i++ {
 			candidate := fmt.Sprintf("%s [%s][%s][%s]_%d.%s", name, gtype, titleID, version, i, ext)
 			candidatePath := filepath.Join(cfg.GamesDir, candidate)
-			if _, err := os.Stat(candidatePath); os.IsNotExist(err) {
+			if _, err := os.Stat(candidatePath); os.IsNotExist(err) || candidatePath == path {
 				newName = candidate
 				newPath = candidatePath
 				break
