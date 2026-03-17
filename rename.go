@@ -175,6 +175,7 @@ func SanitizeName(name string) string {
 
 var (
 	reTitleIDBlock  = regexp.MustCompile(`(?i)\[0100[0-9A-Fa-f]+\].*`)
+	reTypeTag       = regexp.MustCompile(`(?i)\[(BASE|UPD|DLC)\]`)
 	reSceneTags     = regexp.MustCompile(`(?i)[ _-]+(CLC|SUXXORS|VENOM|Nufan|NiiNTENDO|MBC|BigBlueBox|Ziperto|Proper)`)
 	reFormatTags    = regexp.MustCompile(`(?i)[ _]+(Super)?(XC[Iz]|NS[Pz])`)
 	reRegionTags    = regexp.MustCompile(`[ _]+(Eur|EUR|US|USA|JAP|All|As|MULTi5?)(\b|$)`)
@@ -194,6 +195,9 @@ func CleanFilenameTitle(filename string) string {
 
 	// Remove TitleID block and everything after
 	base = reTitleIDBlock.ReplaceAllString(base, "")
+
+	// Remove TYPE tags left over from our own naming format ([BASE], [UPD], [DLC])
+	base = reTypeTag.ReplaceAllString(base, "")
 
 	// Remove scene release tags
 	base = reSceneTags.ReplaceAllString(base, "")
