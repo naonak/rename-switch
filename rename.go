@@ -12,6 +12,7 @@ import (
 type Config struct {
 	Apply      bool
 	GamesDir   string
+	DestDir    string // destination for renamed files ("" = same dir as source)
 	NstoolPath string
 	DB         *TitleDB
 }
@@ -101,12 +102,18 @@ func ProcessFile(cfg *Config, path string) error {
 	// ── Build new filename ───────────────────────────────────────────────────────
 	newName := fmt.Sprintf("%s [%s][%s][%s].%s", name, gtype, titleID, version, ext)
 
+	// Determine target directory: -dest if set, otherwise same dir as source
+	targetDir := cfg.DestDir
+	if targetDir == "" {
+		targetDir = filepath.Dir(path)
+	}
+
 	// Handle duplicates: check if new path already exists (and is a different file)
-	newPath := filepath.Join(cfg.GamesDir, newName)
+	newPath := filepath.Join(targetDir, newName)
 	if _, err := os.Stat(newPath); err == nil && newPath != path {
 		for i := 2; ; i++ {
 			candidate := fmt.Sprintf("%s [%s][%s][%s]_%d.%s", name, gtype, titleID, version, i, ext)
-			candidatePath := filepath.Join(cfg.GamesDir, candidate)
+			candidatePath := filepath.Join(targetDir, candidate)
 			if _, err := os.Stat(candidatePath); os.IsNotExist(err) || candidatePath == path {
 				newName = candidate
 				newPath = candidatePath

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -21,6 +22,7 @@ Options:
   -update-db      Refresh titledb cache from blawar/titledb
   -games DIR      Directory containing game files (default: current directory)
   -nstool PATH    Path to nstool binary (default: searches PATH, then /usr/local/bin/nstool)
+  -dest DIR       Destination directory for renamed files (default: same directory as source)
   -version        Show version
   -h, -help       Show this help
 
@@ -34,6 +36,7 @@ Examples:
   rename-switch game.nsp                                # dry-run on one file
   rename-switch -apply game.nsp update.nsp dlc.nsp      # apply on specific files
   rename-switch -games /mnt/games -apply                # specify games directory
+  rename-switch -games /mnt/games -dest /mnt/out -apply # move renamed files to /mnt/out
   rename-switch -update-db                              # refresh titledb
 
 Output format:
@@ -53,16 +56,18 @@ Errors are written to _errors.log in the games directory (only in -apply mode).
 
 func main() {
 	var (
-		apply     bool
-		updateDB  bool
-		gamesDir  string
+		apply      bool
+		updateDB   bool
+		gamesDir   string
+		destDir    string
 		nstoolPath string
-		showVer   bool
+		showVer    bool
 	)
 
 	flag.BoolVar(&apply, "apply", false, "Apply renames (default: dry-run)")
 	flag.BoolVar(&updateDB, "update-db", false, "Refresh titledb cache")
 	flag.StringVar(&gamesDir, "games", ".", "Games directory")
+	flag.StringVar(&destDir, "dest", "", "Destination directory for renamed files (default: same dir as source)")
 	flag.StringVar(&nstoolPath, "nstool", "", "Path to nstool binary")
 	flag.BoolVar(&showVer, "version", false, "Show version")
 	flag.Usage = func() { fmt.Print(helpText) }
@@ -107,11 +112,23 @@ func main() {
 		fatalf("failed to load titledb: %v\nRun with -update-db to download it.\n", err)
 	}
 
+	// Resolve dest directory
+	if destDir != "" {
+		destDir, err = filepath.Abs(destDir)
+		if err != nil {
+			fatalf("invalid -dest directory: %v\n", err)
+		}
+		if err := os.MkdirAll(destDir, 0755); err != nil {
+			fatalf("cannot create -dest directory: %v\n", err)
+		}
+	}
+
 	cfg := &Config{
-		Apply:     apply,
-		GamesDir:  gamesDir,
+		Apply:      apply,
+		GamesDir:   gamesDir,
+		DestDir:    destDir,
 		NstoolPath: nstoolPath,
-		DB:        db,
+		DB:         db,
 	}
 
 	// Print mode header
@@ -175,23 +192,25 @@ func main() {
 	}
 }
 
-// collectGameFiles returns all .nsp/.xci/.nsz/.xcz files in dir (non-recursive, no hidden files).
+// collectGameFiles returns all .nsp/.xci/.nsz/.xcz files under dir recursively, skipping hidden files.
 func collectGameFiles(dir string) []string {
 	exts := map[string]bool{".nsp": true, ".xci": true, ".nsz": true, ".xcz": true}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil
-	}
 	var files []string
-	for _, e := range entries {
-		if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
-			continue
+	filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
 		}
-		ext := strings.ToLower(filepath.Ext(e.Name()))
-		if exts[ext] {
-			files = append(files, filepath.Join(dir, e.Name()))
+		if strings.HasPrefix(d.Name(), ".") {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
-	}
+		if !d.IsDir() && exts[strings.ToLower(filepath.Ext(d.Name()))] {
+			files = append(files, path)
+		}
+		return nil
+	})
 	sort.Strings(files)
 	return files
 }
