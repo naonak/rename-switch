@@ -23,6 +23,7 @@ Options:
   -games DIR      Directory containing game files (default: current directory)
   -nstool PATH    Path to nstool binary (default: searches PATH, then /usr/local/bin/nstool)
   -dest DIR       Destination directory for renamed files (default: same directory as source)
+  -recursive      Scan subdirectories recursively
   -version        Show version
   -h, -help       Show this help
 
@@ -56,16 +57,18 @@ Errors are written to _errors.log in the games directory (only in -apply mode).
 
 func main() {
 	var (
-		apply      bool
-		updateDB   bool
-		gamesDir   string
-		destDir    string
+		apply     bool
+		updateDB  bool
+		recursive bool
+		gamesDir  string
+		destDir   string
 		nstoolPath string
-		showVer    bool
+		showVer   bool
 	)
 
 	flag.BoolVar(&apply, "apply", false, "Apply renames (default: dry-run)")
 	flag.BoolVar(&updateDB, "update-db", false, "Refresh titledb cache")
+	flag.BoolVar(&recursive, "recursive", false, "Scan subdirectories recursively")
 	flag.StringVar(&gamesDir, "games", ".", "Games directory")
 	flag.StringVar(&destDir, "dest", "", "Destination directory for renamed files (default: same dir as source)")
 	flag.StringVar(&nstoolPath, "nstool", "", "Path to nstool binary")
@@ -165,7 +168,7 @@ func main() {
 			files = append(files, p)
 		}
 	} else {
-		files = collectGameFiles(gamesDir)
+		files = collectGameFiles(gamesDir, recursive)
 	}
 
 	count, errors := 0, 0
@@ -192,25 +195,40 @@ func main() {
 	}
 }
 
-// collectGameFiles returns all .nsp/.xci/.nsz/.xcz files under dir recursively, skipping hidden files.
-func collectGameFiles(dir string) []string {
+// collectGameFiles returns all .nsp/.xci/.nsz/.xcz files in dir, skipping hidden files.
+// If recursive is true, subdirectories are scanned as well.
+func collectGameFiles(dir string, recursive bool) []string {
 	exts := map[string]bool{".nsp": true, ".xci": true, ".nsz": true, ".xcz": true}
 	var files []string
-	filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if strings.HasPrefix(d.Name(), ".") {
-			if d.IsDir() {
-				return filepath.SkipDir
+
+	if recursive {
+		filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			if strings.HasPrefix(d.Name(), ".") {
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if !d.IsDir() && exts[strings.ToLower(filepath.Ext(d.Name()))] {
+				files = append(files, path)
 			}
 			return nil
+		})
+	} else {
+		entries, _ := os.ReadDir(dir)
+		for _, e := range entries {
+			if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+				continue
+			}
+			if exts[strings.ToLower(filepath.Ext(e.Name()))] {
+				files = append(files, filepath.Join(dir, e.Name()))
+			}
 		}
-		if !d.IsDir() && exts[strings.ToLower(filepath.Ext(d.Name()))] {
-			files = append(files, path)
-		}
-		return nil
-	})
+	}
+
 	sort.Strings(files)
 	return files
 }
