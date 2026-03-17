@@ -11,8 +11,10 @@ import (
 
 // NSTMeta contains the metadata extracted from a Switch game file.
 type NSTMeta struct {
-	TitleID string // 16 hex chars, lowercase
-	Version string // "v0", "v131072", etc. Empty if unknown.
+	TitleID       string // 16 hex chars, lowercase
+	Version       string // "v0", "v131072", etc. Empty if unknown.
+	UpdateVersion string // version of the bundled update, "" if none
+	DLCCount      int    // number of bundled DLC CNMTs
 }
 
 var (
@@ -52,13 +54,14 @@ func ExtractMeta(nstoolPath, filePath string) (*NSTMeta, error) {
 		return nil, fmt.Errorf("no cnmt.nca found in %s", filepath.Base(filePath))
 	}
 
-	// Step 3: iterate candidates, prefer Application_ (BASE)
+	// Step 3: iterate all candidates, tracking BASE, UPDATE and DLC counts
 	type candidate struct {
 		innerName string
 		hash      string
 		priority  int // 1=BASE, 2=UPD, 3=DLC
 	}
-	var best *candidate
+	var best, updateCand *candidate
+	dlcCount := 0
 
 	for _, hash := range candidates {
 		cpath := "/" + hash + ".cnmt.nca"
@@ -108,14 +111,20 @@ func ExtractMeta(nstoolPath, filePath string) (*NSTMeta, error) {
 			priority = 2
 		}
 
+		// Save update NCA (copy before potential rename below)
+		if priority == 2 && updateCand == nil {
+			updateCand = &candidate{innerName: innerName, hash: hash, priority: 2}
+			_ = copyFile(tryNca, filepath.Join(tmpDir, "update.cnmt.nca"))
+		}
+		if priority == 3 {
+			dlcCount++
+		}
+
 		if best == nil || priority < best.priority {
 			best = &candidate{innerName: innerName, hash: hash, priority: priority}
 			if err := os.Rename(tryNca, filepath.Join(tmpDir, "cnmt.nca")); err != nil {
 				_ = copyFile(tryNca, filepath.Join(tmpDir, "cnmt.nca"))
 			}
-		}
-		if best.priority == 1 {
-			break // found BASE, stop
 		}
 	}
 
@@ -143,7 +152,26 @@ func ExtractMeta(nstoolPath, filePath string) (*NSTMeta, error) {
 		}
 	}
 
-	return &NSTMeta{TitleID: titleID, Version: version}, nil
+	// Step 6: extract version from bundled update CNMT (if any)
+	updateVersion := ""
+	if updateCand != nil {
+		updateNca := filepath.Join(tmpDir, "update.cnmt.nca")
+		updateMetaCnmt := filepath.Join(tmpDir, "update.meta.cnmt")
+		_, _ = runNstool(nstoolPath, "-x", "/0/"+updateCand.innerName, updateMetaCnmt, updateNca)
+		if _, err := os.Stat(updateMetaCnmt); err == nil {
+			out, _ := runNstool(nstoolPath, "-t", "cnmt", "-v", updateMetaCnmt)
+			if vm := reVersionParen.FindStringSubmatch(out); vm != nil {
+				updateVersion = "v" + vm[1]
+			}
+		}
+	}
+
+	return &NSTMeta{
+		TitleID:       titleID,
+		Version:       version,
+		UpdateVersion: updateVersion,
+		DLCCount:      dlcCount,
+	}, nil
 }
 
 // findCnmtCandidates parses nstool fstree output and returns 32-char hex hashes

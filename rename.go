@@ -31,6 +31,7 @@ func ProcessFile(cfg *Config, path string) error {
 	ext = strings.TrimPrefix(ext, ".")
 
 	titleID, version, method := "", "", "FAST"
+	var meta *NSTMeta
 
 	// ── Fast path: TitleID in filename ──────────────────────────────────────────
 	if m := reTitleID.FindString(filename); m != "" {
@@ -49,7 +50,8 @@ func ProcessFile(cfg *Config, path string) error {
 	} else {
 		// ── Slow path: nstool ──────────────────────────────────────────────────
 		method = "SLOW"
-		meta, err := ExtractMeta(cfg.NstoolPath, path)
+		var err error
+		meta, err = ExtractMeta(cfg.NstoolPath, path)
 		if err != nil {
 			colorPrintf(colorRed, "  [ERROR] Cannot read metadata: %s (%v)\n", filename, err)
 			return fmt.Errorf("nstool: %w", err)
@@ -99,8 +101,25 @@ func ProcessFile(cfg *Config, path string) error {
 		name = "Unknown"
 	}
 
+	// ── Detect bundled update/DLC for BASE files ────────────────────────────────
+	// Fast-path files (titleID in filename) skip ExtractMeta; call it now for BASE.
+	if gtype == "BASE" && meta == nil {
+		if m, err := ExtractMeta(cfg.NstoolPath, path); err == nil {
+			meta = m
+		}
+	}
+
 	// ── Build new filename ───────────────────────────────────────────────────────
-	newName := fmt.Sprintf("%s [%s][%s][%s].%s", name, gtype, titleID, version, ext)
+	bundleSuffix := ""
+	if meta != nil && gtype == "BASE" {
+		if meta.UpdateVersion != "" {
+			bundleSuffix += fmt.Sprintf("[+UPD %s]", meta.UpdateVersion)
+		}
+		if meta.DLCCount > 0 {
+			bundleSuffix += fmt.Sprintf("[+%d DLC]", meta.DLCCount)
+		}
+	}
+	newName := fmt.Sprintf("%s [%s][%s][%s]%s.%s", name, gtype, titleID, version, bundleSuffix, ext)
 
 	// Determine target directory: -dest if set, otherwise same dir as source
 	targetDir := cfg.DestDir
@@ -112,7 +131,7 @@ func ProcessFile(cfg *Config, path string) error {
 	newPath := filepath.Join(targetDir, newName)
 	if _, err := os.Stat(newPath); err == nil && newPath != path {
 		for i := 2; ; i++ {
-			candidate := fmt.Sprintf("%s [%s][%s][%s]_%d.%s", name, gtype, titleID, version, i, ext)
+			candidate := fmt.Sprintf("%s [%s][%s][%s]%s_%d.%s", name, gtype, titleID, version, bundleSuffix, i, ext)
 			candidatePath := filepath.Join(targetDir, candidate)
 			if _, err := os.Stat(candidatePath); os.IsNotExist(err) || candidatePath == path {
 				newName = candidate
