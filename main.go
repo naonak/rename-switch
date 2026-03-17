@@ -19,6 +19,7 @@ Usage:
 
 Options:
   -apply          Apply renames (default: dry-run, only shows what would change)
+  -cleanup        Remove redundant UPD/BASE files after renaming (respects dry-run)
   -update-db      Refresh titledb cache from blawar/titledb
   -src DIR        Directory containing game files (default: current directory)
   -nstool PATH    Path to nstool binary (default: searches PATH, then /usr/local/bin/nstool)
@@ -57,18 +58,20 @@ Errors are written to _errors.log in the source directory (only in -apply mode).
 
 func main() {
 	var (
-		apply     bool
-		updateDB  bool
-		recursive bool
-		gamesDir  string
-		destDir   string
+		apply      bool
+		updateDB   bool
+		recursive  bool
+		cleanup    bool
+		gamesDir   string
+		destDir    string
 		nstoolPath string
-		showVer   bool
+		showVer    bool
 	)
 
 	flag.BoolVar(&apply, "apply", false, "Apply renames (default: dry-run)")
 	flag.BoolVar(&updateDB, "update-db", false, "Refresh titledb cache")
 	flag.BoolVar(&recursive, "recursive", false, "Scan subdirectories recursively")
+	flag.BoolVar(&cleanup, "cleanup", false, "Remove redundant UPD/BASE files after renaming")
 	flag.StringVar(&gamesDir, "src", ".", "Source directory")
 	flag.StringVar(&destDir, "dest", "", "Destination directory for renamed files (default: same dir as source)")
 	flag.StringVar(&nstoolPath, "nstool", "", "Path to nstool binary")
@@ -192,6 +195,14 @@ func main() {
 		if !apply {
 			colorPrint(colorYellow, "Run with -apply to execute renames.\n")
 		}
+	}
+
+	if cleanup {
+		cleanupDir := destDir
+		if cleanupDir == "" {
+			cleanupDir = gamesDir
+		}
+		Cleanup(cleanupDir, nstoolPath, apply)
 	}
 }
 

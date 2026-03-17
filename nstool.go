@@ -11,10 +11,11 @@ import (
 
 // NSTMeta contains the metadata extracted from a Switch game file.
 type NSTMeta struct {
-	TitleID       string // 16 hex chars, lowercase
-	Version       string // "v0", "v131072", etc. Empty if unknown.
-	UpdateVersion string // version of the bundled update, "" if none
-	DLCCount      int    // number of bundled DLC CNMTs
+	TitleID       string   // 16 hex chars, lowercase
+	Version       string   // "v0", "v131072", etc. Empty if unknown.
+	UpdateVersion string   // version of the bundled update, "" if none
+	DLCCount      int      // number of bundled DLC CNMTs
+	DLCTitleIDs   []string // titleIDs of bundled DLC CNMTs
 }
 
 var (
@@ -62,6 +63,7 @@ func ExtractMeta(nstoolPath, filePath string) (*NSTMeta, error) {
 	}
 	var best, updateCand *candidate
 	dlcCount := 0
+	var dlcTitleIDs []string
 
 	for _, hash := range candidates {
 		cpath := "/" + hash + ".cnmt.nca"
@@ -118,6 +120,9 @@ func ExtractMeta(nstoolPath, filePath string) (*NSTMeta, error) {
 		}
 		if priority == 3 {
 			dlcCount++
+			if m := reCnmtInner.FindStringSubmatch(innerName); m != nil {
+				dlcTitleIDs = append(dlcTitleIDs, m[2])
+			}
 		}
 
 		if best == nil || priority < best.priority {
@@ -171,6 +176,7 @@ func ExtractMeta(nstoolPath, filePath string) (*NSTMeta, error) {
 		Version:       version,
 		UpdateVersion: updateVersion,
 		DLCCount:      dlcCount,
+		DLCTitleIDs:   dlcTitleIDs,
 	}, nil
 }
 
