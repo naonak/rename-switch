@@ -11,7 +11,6 @@ FROM debian:bookworm-slim AS nstool-builder
 
 RUN apt-get update && apt-get install -y \
     git \
-    cmake \
     build-essential \
     ca-certificates \
     --no-install-recommends \
@@ -20,9 +19,7 @@ RUN apt-get update && apt-get install -y \
 RUN git clone --recurse-submodules https://github.com/jakcron/nstool.git /nstool
 
 WORKDIR /nstool
-RUN mkdir build && cd build \
-    && cmake .. -DCMAKE_BUILD_TYPE=Release \
-    && make -j$(nproc)
+RUN make deps && make -j$(nproc)
 
 # ── Stage 3: Runtime ────────────────────────────────────────────────────────────
 FROM debian:bookworm-slim
@@ -33,7 +30,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=go-builder  /src/rename-switch       /usr/local/bin/rename-switch
-COPY --from=nstool-builder /nstool/build/nstool   /usr/local/bin/nstool
+COPY --from=nstool-builder /nstool/bin/nstool      /usr/local/bin/nstool
 
 WORKDIR /games
 
