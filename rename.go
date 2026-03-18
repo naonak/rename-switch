@@ -15,6 +15,7 @@ type Config struct {
 	DestDir    string // destination for renamed files ("" = same dir as source)
 	NstoolPath string
 	Recursive  bool
+	PruneEmpty bool
 	DB         *TitleDB
 }
 

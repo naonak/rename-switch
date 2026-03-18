@@ -198,4 +198,8 @@ func processWatchBatch(cfg *Config, files []string, seen map[string]bool, doClea
 		}
 		Cleanup(cleanupDir, cfg.NstoolPath, cfg.Apply)
 	}
+
+	if cfg.PruneEmpty && len(files) > 0 {
+		PruneEmptyDirs(cfg.GamesDir, cfg.Apply)
+	}
 }

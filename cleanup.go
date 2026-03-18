@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -315,6 +316,56 @@ func Cleanup(dir, nstoolPath string, apply bool) {
 	}
 	fmt.Println()
 	if !apply && len(toDelete) > 0 {
+		colorPrint(colorYellow, "Run with -apply to execute.\n")
+	}
+}
+
+// PruneEmptyDirs removes empty subdirectories under srcDir (bottom-up).
+// The srcDir itself is never removed.
+func PruneEmptyDirs(srcDir string, apply bool) {
+	if apply {
+		colorPrint(colorGreen, "\n=== PRUNE EMPTY DIRS ===\n")
+	} else {
+		colorPrint(colorYellow, "\n=== PRUNE EMPTY DIRS (dry run) ===\n")
+	}
+
+	// Collect all subdirectories
+	var dirs []string
+	filepath.WalkDir(srcDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || path == srcDir || !d.IsDir() {
+			return nil
+		}
+		dirs = append(dirs, path)
+		return nil
+	})
+
+	// Process bottom-up (deepest first) so nested empty dirs are caught
+	for i, j := 0, len(dirs)-1; i < j; i, j = i+1, j-1 {
+		dirs[i], dirs[j] = dirs[j], dirs[i]
+	}
+
+	pruned := 0
+	for _, dir := range dirs {
+		entries, err := os.ReadDir(dir)
+		if err != nil || len(entries) > 0 {
+			continue
+		}
+		colorPrintf(colorRed, "  [RMDIR] %s\n", dir)
+		pruned++
+		if apply {
+			if err := os.Remove(dir); err != nil {
+				colorPrintf(colorRed, "  [ERROR] %v\n", err)
+			}
+		}
+	}
+
+	if pruned == 0 {
+		colorPrint(colorGray, "  No empty directories found.\n")
+		return
+	}
+	fmt.Println()
+	colorPrintf(colorCyan, "%d empty director(y/ies) removed\n", pruned)
+	if !apply {
 		colorPrint(colorYellow, "Run with -apply to execute.\n")
 	}
 }

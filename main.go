@@ -21,6 +21,7 @@ Usage:
 Options:
   -apply                Apply renames (default: dry-run, only shows what would change)
   -cleanup              Remove redundant UPD/BASE files after renaming (respects dry-run)
+  -prune-empty          Remove empty directories left after renaming or moving files
   -watch                Watch source directory and process new files automatically
   -watch-interval DUR   Fallback scan interval for -watch mode (default: 60s, e.g. 30s, 5m)
   -update-db            Refresh titledb cache from blawar/titledb
@@ -65,6 +66,7 @@ func main() {
 		updateDB      bool
 		recursive     bool
 		cleanup       bool
+		pruneEmpty    bool
 		watch         bool
 		watchInterval time.Duration
 		gamesDir      string
@@ -77,6 +79,7 @@ func main() {
 	flag.BoolVar(&updateDB, "update-db", false, "Refresh titledb cache")
 	flag.BoolVar(&recursive, "recursive", false, "Scan subdirectories recursively")
 	flag.BoolVar(&cleanup, "cleanup", false, "Remove redundant UPD/BASE files after renaming")
+	flag.BoolVar(&pruneEmpty, "prune-empty", false, "Remove empty directories left after renaming or moving files")
 	flag.BoolVar(&watch, "watch", false, "Watch source directory and process new files automatically")
 	flag.DurationVar(&watchInterval, "watch-interval", 60*time.Second, "Fallback scan interval for -watch mode (e.g. 30s, 5m)")
 	flag.StringVar(&gamesDir, "src", ".", "Source directory")
@@ -142,6 +145,7 @@ func main() {
 		DestDir:    destDir,
 		NstoolPath: nstoolPath,
 		Recursive:  recursive,
+		PruneEmpty: pruneEmpty,
 		DB:         db,
 	}
 
@@ -218,6 +222,10 @@ func main() {
 			cleanupDir = gamesDir
 		}
 		Cleanup(cleanupDir, nstoolPath, apply)
+	}
+
+	if pruneEmpty {
+		PruneEmptyDirs(gamesDir, apply)
 	}
 }
 
