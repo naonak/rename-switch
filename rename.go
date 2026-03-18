@@ -131,7 +131,7 @@ func ProcessFile(cfg *Config, path string) error {
 	// Handle duplicates: check if new path already exists (and is a different file)
 	newPath := filepath.Join(targetDir, newName)
 	if _, err := os.Stat(newPath); err == nil && newPath != path {
-		for i := 2; ; i++ {
+		for i := 2; i <= 1000; i++ {
 			candidate := fmt.Sprintf("%s [%s][%s][%s]%s_%d.%s", name, gtype, titleID, version, bundleSuffix, i, ext)
 			candidatePath := filepath.Join(targetDir, candidate)
 			if _, err := os.Stat(candidatePath); os.IsNotExist(err) || candidatePath == path {

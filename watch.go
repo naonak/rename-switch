@@ -68,8 +68,8 @@ func Watch(cfg *Config, fallbackInterval time.Duration, doCleanup bool) {
 				if info.IsDir() {
 					if cfg.Recursive {
 						// New directory: watch it and scan for game files
-						addWatchDirs(watcher, event.Name, false)
-						for _, f := range collectGameFiles(event.Name, false) {
+						addWatchDirs(watcher, event.Name, cfg.Recursive)
+						for _, f := range collectGameFiles(event.Name, cfg.Recursive) {
 							pending[f] = true
 						}
 					}
