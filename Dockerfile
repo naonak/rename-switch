@@ -1,11 +1,13 @@
 # ── Stage 1: Build Go binary ────────────────────────────────────────────────────
 FROM golang:1.22-alpine AS go-builder
 
+ARG VERSION=dev
+
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY *.go .
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o rename-switch .
+RUN CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${VERSION}" -o rename-switch .
 
 # ── Stage 2: Compile nstool from source ─────────────────────────────────────────
 FROM debian:bookworm-slim AS nstool-builder
