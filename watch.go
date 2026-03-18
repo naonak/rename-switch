@@ -133,7 +133,7 @@ func flushPending(cfg *Config, pending map[string]bool, seen map[string]bool, do
 		return
 	}
 	sort.Strings(newFiles)
-	colorPrintf(colorCyan, "\n[WATCH] %d nouveau(x) fichier(s) détecté(s)\n", len(newFiles))
+	colorPrintf(colorCyan, "\n[WATCH] %d new file(s) detected\n", len(newFiles))
 	processWatchBatch(cfg, newFiles, seen, doCleanup)
 }
 
@@ -155,7 +155,7 @@ func watchPoll(cfg *Config, interval time.Duration, seen map[string]bool, doClea
 				}
 			}
 			if len(newFiles) > 0 {
-				colorPrintf(colorCyan, "\n[WATCH] %d nouveau(x) fichier(s) détecté(s)\n", len(newFiles))
+				colorPrintf(colorCyan, "\n[WATCH] %d new file(s) detected\n", len(newFiles))
 				processWatchBatch(cfg, newFiles, seen, doCleanup)
 			}
 		case <-sigCh:

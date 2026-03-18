@@ -26,6 +26,7 @@ type cleanFile struct {
 	BundledUpdateV int64    // -1 if no bundled update
 	BundledDLCCnt  int      // count of bundled DLCs (from filename)
 	BundledDLCIDs  []string // actual DLC titleIDs (populated lazily via nstool)
+	Size           int64    // file size in bytes
 }
 
 func parseCleanFile(path string) *cleanFile {
@@ -51,7 +52,7 @@ func parseCleanFile(path string) *cleanFile {
 
 	baseTID := titleID[:13] + "000"
 
-	return &cleanFile{
+	cf := &cleanFile{
 		Path:           path,
 		Name:           name,
 		Type:           ftype,
@@ -61,6 +62,24 @@ func parseCleanFile(path string) *cleanFile {
 		BundledUpdateV: bundledUpd,
 		BundledDLCCnt:  dlcCnt,
 	}
+	if info, err := os.Stat(path); err == nil {
+		cf.Size = info.Size()
+	}
+	return cf
+}
+
+// formatSize returns a human-readable file size (e.g. "3.6 GB").
+func formatSize(b int64) string {
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
 // Cleanup scans dir, identifies redundant game files, and prints (or deletes) them.
@@ -196,10 +215,10 @@ func Cleanup(dir, nstoolPath string, apply bool) {
 		for i, upd := range g.upds {
 			var reason string
 			if upd.Version <= maxBundled && maxBundled >= 0 {
-				reason = fmt.Sprintf("couvert par bundle [+UPD v%d] dans %s",
+				reason = fmt.Sprintf("covered by bundled update [+UPD v%d] in %s",
 					maxBundled, filepath.Base(bestBaseForBundle.Path))
 			} else if i > 0 {
-				reason = fmt.Sprintf("obsolète (v%d disponible)", g.upds[0].Version)
+				reason = fmt.Sprintf("outdated (v%d available)", g.upds[0].Version)
 			}
 			if reason == "" {
 				continue
@@ -230,7 +249,7 @@ func Cleanup(dir, nstoolPath string, apply bool) {
 			if base.BundledDLCCnt == 0 {
 				// No bundled DLCs: safe to delete if best has same or newer update
 				toDelete = append(toDelete, candidate{base,
-					fmt.Sprintf("remplacé par %s", filepath.Base(best.Path))})
+					fmt.Sprintf("replaced by %s", filepath.Base(best.Path))})
 				continue
 			}
 
@@ -238,12 +257,12 @@ func Cleanup(dir, nstoolPath string, apply bool) {
 			dlcIDs := resolveDLCIDs(base)
 			if dlcIDs == nil {
 				// Cannot resolve: keep it to be safe
-				toSkip = append(toSkip, candidate{base, "DLCs bundlés non vérifiables (nstool indisponible)"})
+				toSkip = append(toSkip, candidate{base, "bundled DLCs unverifiable (nstool unavailable)"})
 				continue
 			}
 			if isSubset(dlcIDs, bestDLCIDs) {
 				toDelete = append(toDelete, candidate{base,
-					fmt.Sprintf("remplacé par %s", filepath.Base(best.Path))})
+					fmt.Sprintf("replaced by %s", filepath.Base(best.Path))})
 			} else {
 				var unique []string
 				for _, id := range dlcIDs {
@@ -252,7 +271,7 @@ func Cleanup(dir, nstoolPath string, apply bool) {
 					}
 				}
 				toSkip = append(toSkip, candidate{base,
-					fmt.Sprintf("DLCs uniques : [%s]", strings.Join(unique, ", "))})
+					fmt.Sprintf("unique DLCs: [%s]", strings.Join(unique, ", "))})
 			}
 		}
 	}
@@ -265,12 +284,12 @@ func Cleanup(dir, nstoolPath string, apply bool) {
 	}
 
 	if len(toDelete) == 0 && len(toSkip) == 0 {
-		colorPrint(colorGray, "  Aucun fichier redondant détecté.\n")
+		colorPrint(colorGray, "  No redundant files found.\n")
 		return
 	}
 
 	for _, c := range toDelete {
-		colorPrintf(colorRed, "  [DEL]  %s\n", c.file.Name)
+		colorPrintf(colorRed, "  [DEL]  %s  (%s)\n", c.file.Name, formatSize(c.file.Size))
 		colorPrintf(colorGray, "         → %s\n", c.reason)
 		if apply {
 			if err := os.Remove(c.file.Path); err != nil {
@@ -281,13 +300,18 @@ func Cleanup(dir, nstoolPath string, apply bool) {
 
 	for _, c := range toSkip {
 		colorPrintf(colorYellow, "  [SKIP] %s\n", c.file.Name)
-		colorPrintf(colorGray, "         → conservé : %s\n", c.reason)
+		colorPrintf(colorGray, "         → kept: %s\n", c.reason)
+	}
+
+	var totalBytes int64
+	for _, c := range toDelete {
+		totalBytes += c.file.Size
 	}
 
 	fmt.Println()
-	colorPrintf(colorCyan, "%d fichier(s) à supprimer", len(toDelete))
+	colorPrintf(colorCyan, "%d file(s) to delete, %s will be freed", len(toDelete), formatSize(totalBytes))
 	if len(toSkip) > 0 {
-		colorPrintf(colorCyan, ", %d conservé(s) malgré redondance partielle", len(toSkip))
+		colorPrintf(colorCyan, " (%d kept despite partial redundancy)", len(toSkip))
 	}
 	fmt.Println()
 	if !apply && len(toDelete) > 0 {
