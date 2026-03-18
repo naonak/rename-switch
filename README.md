@@ -152,6 +152,19 @@ docker run --rm \
 
 Stop with `Ctrl+C`.
 
+### Docker Compose
+
+```yaml
+services:
+  rename-switch:
+    image: ghcr.io/naonak/rename-switch:latest
+    restart: unless-stopped
+    volumes:
+      - ~/.switch:/root/.switch
+      - /path/to/switch-games:/games
+    command: ["-watch", "-apply", "-cleanup"]
+```
+
 ---
 
 ## How it works
