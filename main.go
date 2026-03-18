@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 const version = "1.0.0"
@@ -18,15 +19,17 @@ Usage:
   rename-switch [options] [files...]
 
 Options:
-  -apply          Apply renames (default: dry-run, only shows what would change)
-  -cleanup        Remove redundant UPD/BASE files after renaming (respects dry-run)
-  -update-db      Refresh titledb cache from blawar/titledb
-  -src DIR        Directory containing game files (default: current directory)
-  -nstool PATH    Path to nstool binary (default: searches PATH, then /usr/local/bin/nstool)
-  -dest DIR       Destination directory for renamed files (default: same directory as source)
-  -recursive      Scan subdirectories recursively
-  -version        Show version
-  -h, -help       Show this help
+  -apply                Apply renames (default: dry-run, only shows what would change)
+  -cleanup              Remove redundant UPD/BASE files after renaming (respects dry-run)
+  -watch                Watch source directory and process new files automatically
+  -watch-interval DUR   Polling interval for -watch mode (default: 10s, e.g. 30s, 1m)
+  -update-db            Refresh titledb cache from blawar/titledb
+  -src DIR              Directory containing game files (default: current directory)
+  -nstool PATH          Path to nstool binary (default: searches PATH, then /usr/local/bin/nstool)
+  -dest DIR             Destination directory for renamed files (default: same directory as source)
+  -recursive            Scan subdirectories recursively
+  -version              Show version
+  -h, -help             Show this help
 
 Arguments:
   files           One or more filenames to process (basename or full path).
@@ -58,20 +61,24 @@ Errors are written to _errors.log in the source directory (only in -apply mode).
 
 func main() {
 	var (
-		apply      bool
-		updateDB   bool
-		recursive  bool
-		cleanup    bool
-		gamesDir   string
-		destDir    string
-		nstoolPath string
-		showVer    bool
+		apply         bool
+		updateDB      bool
+		recursive     bool
+		cleanup       bool
+		watch         bool
+		watchInterval time.Duration
+		gamesDir      string
+		destDir       string
+		nstoolPath    string
+		showVer       bool
 	)
 
 	flag.BoolVar(&apply, "apply", false, "Apply renames (default: dry-run)")
 	flag.BoolVar(&updateDB, "update-db", false, "Refresh titledb cache")
 	flag.BoolVar(&recursive, "recursive", false, "Scan subdirectories recursively")
 	flag.BoolVar(&cleanup, "cleanup", false, "Remove redundant UPD/BASE files after renaming")
+	flag.BoolVar(&watch, "watch", false, "Watch source directory and process new files automatically")
+	flag.DurationVar(&watchInterval, "watch-interval", 10*time.Second, "Polling interval for -watch mode (e.g. 10s, 1m)")
 	flag.StringVar(&gamesDir, "src", ".", "Source directory")
 	flag.StringVar(&destDir, "dest", "", "Destination directory for renamed files (default: same dir as source)")
 	flag.StringVar(&nstoolPath, "nstool", "", "Path to nstool binary")
@@ -134,6 +141,7 @@ func main() {
 		GamesDir:   gamesDir,
 		DestDir:    destDir,
 		NstoolPath: nstoolPath,
+		Recursive:  recursive,
 		DB:         db,
 	}
 
@@ -174,6 +182,13 @@ func main() {
 		files = collectGameFiles(gamesDir, recursive)
 	}
 
+	// ── Watch mode ───────────────────────────────────────────────────────────────
+	if watch {
+		Watch(cfg, watchInterval, cleanup)
+		return
+	}
+
+	// ── Normal mode ───────────────────────────────────────────────────────────
 	count, errors := 0, 0
 	for _, f := range files {
 		if err := ProcessFile(cfg, f); err != nil {

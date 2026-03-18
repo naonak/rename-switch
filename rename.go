@@ -14,6 +14,7 @@ type Config struct {
 	GamesDir   string
 	DestDir    string // destination for renamed files ("" = same dir as source)
 	NstoolPath string
+	Recursive  bool
 	DB         *TitleDB
 }
 
