@@ -22,7 +22,7 @@ Options:
   -apply                Apply renames (default: dry-run, only shows what would change)
   -cleanup              Remove redundant UPD/BASE files after renaming (respects dry-run)
   -watch                Watch source directory and process new files automatically
-  -watch-interval DUR   Polling interval for -watch mode (default: 10s, e.g. 30s, 1m)
+  -watch-interval DUR   Fallback scan interval for -watch mode (default: 60s, e.g. 30s, 5m)
   -update-db            Refresh titledb cache from blawar/titledb
   -src DIR              Directory containing game files (default: current directory)
   -nstool PATH          Path to nstool binary (default: searches PATH, then /usr/local/bin/nstool)
@@ -78,7 +78,7 @@ func main() {
 	flag.BoolVar(&recursive, "recursive", false, "Scan subdirectories recursively")
 	flag.BoolVar(&cleanup, "cleanup", false, "Remove redundant UPD/BASE files after renaming")
 	flag.BoolVar(&watch, "watch", false, "Watch source directory and process new files automatically")
-	flag.DurationVar(&watchInterval, "watch-interval", 10*time.Second, "Polling interval for -watch mode (e.g. 10s, 1m)")
+	flag.DurationVar(&watchInterval, "watch-interval", 60*time.Second, "Fallback scan interval for -watch mode (e.g. 30s, 5m)")
 	flag.StringVar(&gamesDir, "src", ".", "Source directory")
 	flag.StringVar(&destDir, "dest", "", "Destination directory for renamed files (default: same dir as source)")
 	flag.StringVar(&nstoolPath, "nstool", "", "Path to nstool binary")
