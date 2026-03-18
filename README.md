@@ -189,11 +189,39 @@ Files without keys in the filename can still be processed via the slow path, but
 
 ---
 
+## Prune empty directories
+
+The `-prune-empty` flag removes subdirectories left empty after renaming or moving files (e.g. when using `-dest` or after `-cleanup`). The source root directory is never removed.
+
+```bash
+# Preview (dry-run)
+./rename-switch -src /games -dest /games-out -prune-empty
+
+# Apply
+./rename-switch -src /games -dest /games-out -apply -prune-empty
+
+# Combine with cleanup
+./rename-switch -apply -cleanup -prune-empty
+```
+
+Example output:
+```
+=== PRUNE EMPTY DIRS (dry run) ===
+  [RMDIR] /games/Old Subfolder
+  [RMDIR] /games/Another Empty Dir
+
+2 empty director(y/ies) removed
+Run with -apply to execute.
+```
+
+---
+
 ## Options
 
 ```
 -apply                Apply renames (default: dry-run)
 -cleanup              Remove redundant UPD/BASE files after renaming
+-prune-empty          Remove empty directories left after renaming or moving files
 -watch                Watch source directory and process new files automatically
 -watch-interval DUR   Fallback scan interval for -watch mode (default: 60s)
 -update-db            Refresh titledb cache from blawar/titledb
