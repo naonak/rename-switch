@@ -22,6 +22,41 @@ When a BASE file bundles an update and/or DLC content, the suffix `[+UPD vX]` an
 
 ---
 
+## Quickstart
+
+### Without Docker
+
+```bash
+# Preview all changes (dry-run) — rename, cleanup redundant files, remove empty dirs
+./rename-switch -src /games -dest /games -recursive -cleanup -prune-empty
+
+# Apply
+./rename-switch -src /games -dest /games -recursive -cleanup -prune-empty -apply
+```
+
+### With Docker
+
+[Install Docker](https://docs.docker.com/get-started/get-docker/)
+
+```bash
+# Preview all changes (dry-run)
+docker run --rm \
+  -v ~/.switch:/root/.switch \
+  -v /path/to/switch-games:/games \
+  ghcr.io/naonak/rename-switch -src /games -dest /games -recursive -cleanup -prune-empty
+
+# Apply
+docker run --rm \
+  -v ~/.switch:/root/.switch \
+  -v /path/to/switch-games:/games \
+  ghcr.io/naonak/rename-switch -src /games -dest /games -recursive -cleanup -prune-empty -apply
+```
+
+> `-dest` equal to `-src` means files are renamed in place at the root of the directory.
+> Subdirectory files are moved to the root, then empty subdirectories are removed by `-prune-empty`.
+
+---
+
 ## Usage
 
 ### Without Docker (requires Go + nstool installed)
