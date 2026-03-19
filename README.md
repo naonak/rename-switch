@@ -65,9 +65,6 @@ docker run --rm \
 # Build
 go build -o rename-switch .
 
-# First run: download titledb (~50MB)
-./rename-switch -update-db
-
 # Dry-run on all files in current directory
 ./rename-switch
 
@@ -105,7 +102,7 @@ docker run --rm \
   -v /path/to/switch-games:/games \
   ghcr.io/naonak/rename-switch -apply
 
-# Update titledb
+# Force refresh titledb
 docker run --rm \
   -v ~/.switch:/root/.switch \
   ghcr.io/naonak/rename-switch -update-db
@@ -297,7 +294,7 @@ docker run --rm \
 -prune-empty          Remove empty directories left after renaming or moving files
 -watch                Watch source directory and process new files automatically
 -watch-interval DUR   Fallback scan interval for -watch mode (default: 60s)
--update-db            Refresh titledb cache from blawar/titledb
+-update-db            Force refresh titledb cache from blawar/titledb (auto-downloaded on first run)
 -src DIR              Source directory (default: current directory)
 -dest DIR             Destination directory for renamed files (default: same as source)
 -recursive            Scan subdirectories recursively

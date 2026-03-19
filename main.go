@@ -24,7 +24,7 @@ Options:
   -prune-empty          Remove empty directories left after renaming or moving files
   -watch                Watch source directory and process new files automatically
   -watch-interval DUR   Fallback scan interval for -watch mode (default: 60s, e.g. 30s, 5m)
-  -update-db            Refresh titledb cache from blawar/titledb
+  -update-db            Force refresh titledb cache (auto-downloaded on first run)
   -src DIR              Directory containing game files (default: current directory)
   -nstool PATH          Path to nstool binary (default: searches PATH, then /usr/local/bin/nstool)
   -dest DIR             Destination directory for renamed files (default: same directory as source)
@@ -125,7 +125,12 @@ func main() {
 
 	db, err := LoadTitleDB(cacheDir)
 	if err != nil {
-		fatalf("failed to load titledb: %v\nRun with -update-db to download it.\n", err)
+		colorPrint(colorCyan, "titledb not found, downloading...\n")
+		db = &TitleDB{}
+		if err := db.Update(cacheDir); err != nil {
+			fatalf("titledb download failed: %v\n", err)
+		}
+		colorPrint(colorGreen, "Database ready.\n")
 	}
 
 	// Resolve dest directory
