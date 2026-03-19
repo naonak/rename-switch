@@ -1,45 +1,46 @@
 # rename-switch
 
-A CLI tool to rename Nintendo Switch game files (`.nsp`, `.xci`, `.nsz`, `.xcz`) with standardized names using official titles from [blawar/titledb](https://github.com/blawar/titledb) and metadata from [nstool](https://github.com/jakcron/nstool).
-
-## Output format
+Automatically rename Nintendo Switch game files (`.nsp`, `.xci`, `.nsz`, `.xcz`) using official titles from [blawar/titledb](https://github.com/blawar/titledb). Bundled updates and DLC are detected and reflected directly in the filename.
 
 ```
-Game Name [TYPE][titleid][vVERSION].ext
-Game Name [BASE][titleid][vVERSION][+UPD vX][+N DLC].ext
+# Before
+0100A3900C3E8000.nsp
+base_game.xci
+v196608.nsp
+
+# After
+Fire Emblem™ - Three Houses [BASE][010055d009f78000][v0][+UPD v196608][+6 DLC].xci
+Fire Emblem™ - Three Houses [UPD][010055d009f78000][v196608].nsp
 ```
 
-Examples:
-```
-Metroid Prime Remastered [BASE][010012101468c000][v0].xci
-Fire Emblem - Three Houses [BASE][010055d009f78000][v0][+UPD v196608][+6 DLC].xci
-Blazing Beaks [UPD][010021a00de54800][v655360].nsp
-```
+## Features
 
-Types: `BASE` (base game), `UPD` (update/patch), `DLC` (downloadable content)
+- **Auto-rename** — resolves official game titles from titledb by TitleID
+- **Bundle detection** — detects updates and DLC bundled inside a BASE dump and appends `[+UPD vX][+N DLC]` to the filename
+- **Cleanup** — identifies redundant files (superseded UPDs, duplicate BASEs) and shows the total space that can be freed
+- **Watch mode** — monitors a directory and renames new files as they arrive
+- **Safe by default** — dry-run mode shows all changes before anything is modified; use `-apply` to execute
+- **Docker ready** — zero-install option, works on any OS
 
-When a BASE file bundles an update and/or DLC content, the suffix `[+UPD vX]` and/or `[+N DLC]` is appended automatically.
+---
+
+## Requirements
+
+- **Switch keys** — `~/.switch/prod.keys` and `~/.switch/title.keys` (needed to read files that don't already have a TitleID in their filename — see [Switch keys](#switch-keys))
+- **Docker** (recommended) OR **Go 1.22+** + [nstool](https://github.com/jakcron/nstool)
 
 ---
 
 ## Quickstart
 
-### Without Docker
-
-```bash
-# Preview all changes (dry-run) — rename, cleanup redundant files, remove empty dirs
-./rename-switch -src /games -dest /games -recursive -cleanup -prune-empty
-
-# Apply
-./rename-switch -src /games -dest /games -recursive -cleanup -prune-empty -apply
-```
-
-### With Docker
+### With Docker (recommended)
 
 [Install Docker](https://docs.docker.com/get-started/get-docker/)
 
+`~/.switch` must contain your Switch keys (`prod.keys`, `title.keys`) — see [Switch keys](#switch-keys). It also stores the titledb cache (auto-downloaded on first run).
+
 ```bash
-# Preview all changes (dry-run)
+# Preview all changes — rename, cleanup redundant files, flatten subdirectories
 docker run --rm \
   -v ~/.switch:/root/.switch \
   -v /path/to/switch-games:/games \
@@ -52,85 +53,58 @@ docker run --rm \
   ghcr.io/naonak/rename-switch -src /games -dest /games -recursive -cleanup -prune-empty -apply
 ```
 
-> `-dest` equal to `-src` means files are renamed in place at the root of the directory.
-> Subdirectory files are moved to the root, then empty subdirectories are removed by `-prune-empty`.
-
----
-
-## Usage
-
-### Without Docker (requires Go + nstool installed)
+### Without Docker
 
 ```bash
-# Build
+# Clone and build
+git clone https://github.com/naonak/rename-switch.git
+cd rename-switch
 go build -o rename-switch .
 
-# Dry-run on all files in current directory
-./rename-switch
+# Preview all changes
+./rename-switch -src /games -dest /games -recursive -cleanup -prune-empty
 
-# Apply renames
-./rename-switch -apply
-
-# Target specific files
-./rename-switch -apply game.nsp update.nsp
-
-# Specify games directory
-./rename-switch -src /mnt/switch-src -apply
-
-# Custom nstool path
-./rename-switch -nstool /usr/local/bin/nstool -apply
-
-# Scan subdirectories recursively
-./rename-switch -src /games -recursive -apply
+# Apply
+./rename-switch -src /games -dest /games -recursive -cleanup -prune-empty -apply
 ```
 
-### With Docker (recommended)
-
-```bash
-# Pull the latest image
-docker pull ghcr.io/naonak/rename-switch:latest
-
-# Dry-run on your games directory
-docker run --rm \
-  -v ~/.switch:/root/.switch \
-  -v /path/to/switch-games:/games \
-  ghcr.io/naonak/rename-switch
-
-# Apply renames
-docker run --rm \
-  -v ~/.switch:/root/.switch \
-  -v /path/to/switch-games:/games \
-  ghcr.io/naonak/rename-switch -apply
-
-# Force refresh titledb
-docker run --rm \
-  -v ~/.switch:/root/.switch \
-  ghcr.io/naonak/rename-switch -update-db
-```
-
-> **Note:** Mount `~/.switch` to persist the titledb cache and provide Switch keys (`prod.keys`, `title.keys`) for nstool decryption.
-
-#### Build from source
-
-```bash
-docker build -t rename-switch .
-docker run --rm \
-  -v ~/.switch:/root/.switch \
-  -v /path/to/switch-games:/games \
-  rename-switch -apply
-```
+> **Note:** `-dest` equal to `-src` renames files in place at the root of the directory. Files in subdirectories are moved to the root; `-prune-empty` then removes the now-empty subdirectories.
 
 ---
 
-## Cleanup — remove redundant files
+## Filename format
 
-The `-cleanup` flag identifies and optionally removes redundant files after renaming:
+```
+Game Name [TYPE][titleid][vVERSION].ext
+Game Name [BASE][titleid][vVERSION][+UPD vX][+N DLC].ext
+```
 
-- **Standalone UPD covered by a bundled BASE** — e.g. if you have both `Game [BASE][...][+UPD v2]` and `Game [UPD][...][v2]`, the standalone UPD is redundant.
-- **Outdated UPD files** — older update versions are removed when a newer one is present.
-- **Duplicate BASE files** — the most complete version is kept (highest bundled update + most DLCs). A BASE with unique DLCs not present elsewhere is always kept.
+Examples:
+```
+Metroid Prime Remastered [BASE][010012101468c000][v0].xci
+Fire Emblem™ - Three Houses [BASE][010055d009f78000][v0][+UPD v196608][+6 DLC].xci
+Blazing Beaks [UPD][010021a00de54800][v655360].nsp
+```
 
-Each file marked for deletion shows its size, and the total space freed is shown at the end.
+| Type | Meaning |
+|------|---------|
+| `BASE` | Base game (TitleID ends in `000`) |
+| `UPD` | Update / patch (TitleID ends in `800`) |
+| `DLC` | Downloadable content |
+
+---
+
+## Features in depth
+
+### Cleanup (`-cleanup`)
+
+Identifies and optionally removes redundant files:
+
+- **Standalone UPD covered by a bundled BASE** — if you have both `Game [BASE][...][+UPD v2]` and `Game [UPD][...][v2]`, the standalone UPD is redundant
+- **Outdated UPD files** — older update versions superseded by a newer one
+- **Duplicate BASE files** — the most complete version is kept (highest bundled update + most DLCs); a BASE with unique DLCs is always kept
+
+Each file marked for deletion shows its size; the total space freed is shown at the end.
 
 ```bash
 # Preview what would be deleted (dry-run)
@@ -138,12 +112,6 @@ Each file marked for deletion shows its size, and the total space freed is shown
 
 # Apply deletions
 ./rename-switch -apply -cleanup
-
-# With Docker
-docker run --rm \
-  -v ~/.switch:/root/.switch \
-  -v /path/to/switch-games:/games \
-  ghcr.io/naonak/rename-switch -apply -cleanup
 ```
 
 Example output:
@@ -162,32 +130,23 @@ Run with -apply to execute.
 
 ---
 
-## Watch mode — process new files automatically
+### Watch mode (`-watch`)
 
-The `-watch` flag monitors the source directory and processes new files as they appear, using native filesystem events (inotify on Linux, FSEvents on macOS) for near-instant detection.
+Monitors the source directory and renames new files as they appear.
 
-A periodic fallback scan (default: 60s) is also run to catch any files missed on network mounts (NFS/SMB) where kernel events may be unreliable.
+A periodic fallback scan (default: 60s) catches files missed on network mounts (NFS/SMB) where filesystem events may be unreliable.
 
 ```bash
-# Watch with dry-run (default)
-./rename-switch -watch -src /games
-
 # Watch + apply + cleanup
 ./rename-switch -watch -apply -cleanup -src /games
 
 # Custom fallback scan interval
-./rename-switch -watch -watch-interval 120s -apply
-
-# With Docker
-docker run --rm \
-  -v ~/.switch:/root/.switch \
-  -v /path/to/switch-games:/games \
-  ghcr.io/naonak/rename-switch -watch -apply -cleanup
+./rename-switch -watch -watch-interval 120s -apply -src /games
 ```
 
 Stop with `Ctrl+C`.
 
-### Docker Compose
+#### Docker Compose
 
 ```yaml
 services:
@@ -202,41 +161,37 @@ services:
 
 ---
 
-## How it works
+### Destination directory (`-dest`)
 
-**Fast path** — if the filename already contains a TitleID (`[0100XXXXXXXXXXXX]`), it's extracted directly (no nstool needed).
+By default, files are renamed **in place**. Use `-dest` to move renamed files to a separate directory (created automatically if needed).
 
-**Slow path** — for files without a TitleID, `nstool` reads the CNMT metadata from the file's internal structure to extract the TitleID and version. This handles both NSP and XCI formats, including SuperXCI (multiple games bundled) and newer key generations (keygen ≥ 18).
-
-**Bundle detection** — for BASE files, all CNMT entries are scanned to detect bundled update patches and DLC content. The results are reflected in the filename suffix (`[+UPD vX][+N DLC]`).
-
----
-
-## Switch keys
-
-To decrypt files with `nstool`, place your Switch keys at:
-```
-~/.switch/prod.keys
-~/.switch/title.keys
-```
-
-Files without keys in the filename can still be processed via the slow path, but encrypted content may not be readable without valid keys.
-
----
-
-## Prune empty directories
-
-The `-prune-empty` flag removes subdirectories left empty after renaming or moving files (e.g. when using `-dest` or after `-cleanup`). The source root directory is never removed.
+| Scenario | Behavior |
+|----------|----------|
+| `-dest` not set | Files renamed in place, no move |
+| `-dest` same as `-src` | Root-level files renamed in place; subdirectory files (with `-recursive`) moved to the root |
+| `-dest` different from `-src` | Files moved and renamed into `-dest` |
 
 ```bash
-# Preview (dry-run)
-./rename-switch -src /games -dest /games-out -prune-empty
+# Rename in place
+./rename-switch -src /games -apply
 
-# Apply
+# Move renamed files to a separate directory
+./rename-switch -src /games -dest /games-renamed -apply
+
+# Flatten subdirectories into dest root
+./rename-switch -src /games -dest /games-renamed -recursive -apply
+```
+
+> **Tip:** combine with `-prune-empty` to remove subdirectories left empty in `-src` after the move.
+
+---
+
+### Prune empty directories (`-prune-empty`)
+
+Removes subdirectories left empty after renaming or moving files. Works bottom-up so nested empty directories are caught as well. The source root is never removed.
+
+```bash
 ./rename-switch -src /games -dest /games-out -apply -prune-empty
-
-# Combine with cleanup
-./rename-switch -apply -cleanup -prune-empty
 ```
 
 Example output:
@@ -245,48 +200,42 @@ Example output:
   [RMDIR] /games/Old Subfolder
   [RMDIR] /games/Another Empty Dir
 
-2 empty director(y/ies) removed
+2 empty director(y/ies) to remove
 Run with -apply to execute.
 ```
 
 ---
 
-## Destination directory (-dest)
+## How it works
 
-By default, files are renamed **in place** in their source directory. Use `-dest` to move renamed files to a separate directory.
+**Fast path** — if the filename already contains a TitleID (`[0100XXXXXXXXXXXX]`), it's extracted directly. No nstool required.
 
-| Scenario | Behavior |
-|---|---|
-| `-dest` not set | Files renamed in place (no move) |
-| `-dest` same as `-src` | Same as above for root-level files; subdirectory files (with `-recursive`) are moved to the root of `-dest` |
-| `-dest` different from `-src` | Files moved and renamed into `-dest` (created automatically if needed) |
+**Slow path** — for files without a TitleID, `nstool` reads the CNMT metadata from the file's internal structure to extract the TitleID and version. Handles NSP and XCI formats, including SuperXCI and newer key generations (keygen ≥ 18).
 
-```bash
-# Rename in place (default, no -dest)
-./rename-switch -src /games -apply
-
-# Move renamed files to a separate output directory
-./rename-switch -src /games -dest /games-renamed -apply
-
-# Dry-run preview: see what would move where
-./rename-switch -src /games -dest /games-renamed
-
-# Flatten subdirectories into dest root (recursive source, flat dest)
-./rename-switch -src /games -dest /games-renamed -recursive -apply
-
-# With Docker
-docker run --rm \
-  -v ~/.switch:/root/.switch \
-  -v /path/to/switch-games:/games \
-  -v /path/to/output:/out \
-  ghcr.io/naonak/rename-switch -src /games -dest /out -apply
-```
-
-> **Tip:** combine with `-prune-empty` to remove subdirectories left empty in `-src` after the move.
+**Bundle detection** — for BASE files, all CNMT entries are scanned to detect bundled update patches and DLC. Results are reflected in the filename suffix (`[+UPD vX][+N DLC]`).
 
 ---
 
-## Options
+## Switch keys
+
+Required to decrypt files via the slow path. Place your keys at:
+
+```
+~/.switch/prod.keys
+~/.switch/title.keys
+```
+
+With Docker, mount `~/.switch` as a volume:
+
+```bash
+-v ~/.switch:/root/.switch
+```
+
+Files that already have a TitleID in their filename are processed via the fast path and don't need keys.
+
+---
+
+## All options
 
 ```
 -apply                Apply renames (default: dry-run)
@@ -294,7 +243,7 @@ docker run --rm \
 -prune-empty          Remove empty directories left after renaming or moving files
 -watch                Watch source directory and process new files automatically
 -watch-interval DUR   Fallback scan interval for -watch mode (default: 60s)
--update-db            Force refresh titledb cache from blawar/titledb (auto-downloaded on first run)
+-update-db            Force refresh titledb cache (auto-downloaded on first run)
 -src DIR              Source directory (default: current directory)
 -dest DIR             Destination directory for renamed files (default: same as source)
 -recursive            Scan subdirectories recursively
@@ -311,4 +260,14 @@ Requires Go 1.22+:
 
 ```bash
 go build -o rename-switch .
+```
+
+Or with Docker:
+
+```bash
+docker build -t rename-switch .
+docker run --rm \
+  -v ~/.switch:/root/.switch \
+  -v /path/to/switch-games:/games \
+  rename-switch -apply
 ```
