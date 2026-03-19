@@ -9,3 +9,4 @@ titledb_versions.json
 
 # macOS
 .DS_Store
+*.code-workspace
