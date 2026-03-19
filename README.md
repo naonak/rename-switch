@@ -216,6 +216,41 @@ Run with -apply to execute.
 
 ---
 
+## Destination directory (-dest)
+
+By default, files are renamed **in place** in their source directory. Use `-dest` to move renamed files to a separate directory.
+
+| Scenario | Behavior |
+|---|---|
+| `-dest` not set | Files renamed in place (no move) |
+| `-dest` same as `-src` | Same as above for root-level files; subdirectory files (with `-recursive`) are moved to the root of `-dest` |
+| `-dest` different from `-src` | Files moved and renamed into `-dest` (created automatically if needed) |
+
+```bash
+# Rename in place (default, no -dest)
+./rename-switch -src /games -apply
+
+# Move renamed files to a separate output directory
+./rename-switch -src /games -dest /games-renamed -apply
+
+# Dry-run preview: see what would move where
+./rename-switch -src /games -dest /games-renamed
+
+# Flatten subdirectories into dest root (recursive source, flat dest)
+./rename-switch -src /games -dest /games-renamed -recursive -apply
+
+# With Docker
+docker run --rm \
+  -v ~/.switch:/root/.switch \
+  -v /path/to/switch-games:/games \
+  -v /path/to/output:/out \
+  ghcr.io/naonak/rename-switch -src /games -dest /out -apply
+```
+
+> **Tip:** combine with `-prune-empty` to remove subdirectories left empty in `-src` after the move.
+
+---
+
 ## Options
 
 ```
