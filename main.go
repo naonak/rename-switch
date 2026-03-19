@@ -112,6 +112,13 @@ func main() {
 	// Cache dir for titledb
 	cacheDir := filepath.Join(homeDir(), ".switch")
 
+	// Warn if Switch keys are missing (needed for slow path)
+	for _, keyFile := range []string{"prod.keys", "title.keys"} {
+		if _, err := os.Stat(filepath.Join(cacheDir, keyFile)); os.IsNotExist(err) {
+			colorPrintf(colorYellow, "Warning: %s not found in %s — files without a TitleID in their name cannot be read\n", keyFile, cacheDir)
+		}
+	}
+
 	// Load or update titledb
 	if updateDB {
 		colorPrint(colorCyan, "Updating titledb...\n")
