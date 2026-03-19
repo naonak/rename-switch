@@ -55,6 +55,8 @@ docker run --rm \
 
 ### Without Docker
 
+Place your Switch keys in `~/.switch/prod.keys` and `~/.switch/title.keys` — see [Switch keys](#switch-keys). The titledb cache is stored there too (auto-downloaded on first run).
+
 ```bash
 # Clone and build
 git clone https://github.com/naonak/rename-switch.git
