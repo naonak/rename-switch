@@ -47,6 +47,9 @@ go build -o rename-switch .
 
 # Custom nstool path
 ./rename-switch -nstool /usr/local/bin/nstool -apply
+
+# Scan subdirectories recursively
+./rename-switch -src /games -recursive -apply
 ```
 
 ### With Docker (recommended)
