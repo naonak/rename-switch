@@ -310,7 +310,11 @@ func Cleanup(dir, nstoolPath string, apply bool) {
 	}
 
 	fmt.Println()
-	colorPrintf(colorCyan, "%d file(s) to delete, %s will be freed", len(toDelete), formatSize(totalBytes))
+	if apply {
+		colorPrintf(colorGreen, "%d file(s) deleted, %s freed", len(toDelete), formatSize(totalBytes))
+	} else {
+		colorPrintf(colorCyan, "%d file(s) to delete, %s will be freed", len(toDelete), formatSize(totalBytes))
+	}
 	if len(toSkip) > 0 {
 		colorPrintf(colorCyan, " (%d kept despite partial redundancy)", len(toSkip))
 	}
@@ -364,8 +368,10 @@ func PruneEmptyDirs(srcDir string, apply bool) {
 		return
 	}
 	fmt.Println()
-	colorPrintf(colorCyan, "%d empty director(y/ies) removed\n", pruned)
-	if !apply {
+	if apply {
+		colorPrintf(colorGreen, "%d empty director(y/ies) removed\n", pruned)
+	} else {
+		colorPrintf(colorCyan, "%d empty director(y/ies) to remove\n", pruned)
 		colorPrint(colorYellow, "Run with -apply to execute.\n")
 	}
 }
